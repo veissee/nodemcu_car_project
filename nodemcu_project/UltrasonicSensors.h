@@ -16,7 +16,7 @@ class UltrasonicSensors{
 
     //Default variables
     const uint16_t maxEchoDistance = 500;
-    uint8_t minDistancetoSayItsVeryClose = 15;
+    uint8_t minDistancetoSayItsVeryClose = 25;
 
     //Variables for statuses
     const char* status[5] = {
