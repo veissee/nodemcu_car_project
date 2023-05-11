@@ -29,6 +29,19 @@ class Cars{
     //Current speed variable can be change by setSpeed(uint_8 speed) and get by getSpeed().
     uint8_t currentSpeed;
 
+    const char* states[9] = {
+    "Parking",
+    "Forward",
+    "Forward Right",
+    "Forward Left",
+    "Backward",
+    "Backward Right",
+    "Backward Left",
+    "Rotating Right",
+    "Rotating Left"
+    };
+    char* currentState;
+
     //Initialitazion of the cars object.
     //Set the pins as outputs.
     //stop any movement and set the current speed as the max speed value.
@@ -63,10 +76,14 @@ class Cars{
     void turnRight();
     void turnLeft(float turnAmount);
     void turnLeft();
+
+    void backRight(float turnAmount);
+    void backLeft(float turnAmount);
+    void backRight();
+    void backLeft();
     
     //Stop the movement of the motor by setting the motor speed to 0.
     void stopMovement();
-
     // void testMovement();
 };
 
