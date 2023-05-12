@@ -23,8 +23,8 @@
 #define D8 15
 
 //Web stuffs
-// const char* ssid = "Tiara1";
-// const char* pass = "0320281926";
+//set SSID and PASS
+//put the server at port 80 and websocket at 81
 const char* ssid = "Teter";
 const char* pass = "qwe123456";
 AsyncWebServer server(80); 
@@ -69,96 +69,65 @@ void _init() {
   //Connectiong to WiFi
   connectToWiFi();
 
+  //initialize the server
   initServer();
 }
 
+//Setup function run at nodeMCU start
 void setup() {
   _init();
-  myCar.setSpeed(255);
-  pinExtender.pinMode(P7,OUTPUT);
 }
 
+//This will be called at websocket onEvent when initializing the server
+//When websocket receive message from the client it will run stuffs based on the message
 void onWebSocketEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t length){
   switch (type){
+    //Client is disconnected from the server
     case WStype_DISCONNECTED:
       Serial.printf("[%u] Disconnected!\n", clientNum);
     break;
+    //Client is connected to the server
     case WStype_CONNECTED:
       Serial.printf("[%u] Connected from ip %u.%u.%u.%u\n", clientNum, 
                      webSocket.remoteIP(clientNum)[0], webSocket.remoteIP(clientNum)[1],
                      webSocket.remoteIP(clientNum)[2], webSocket.remoteIP(clientNum)[3]);
     break;
+    //This is where the interaction from the webpage will be process
+    //When the websocket receive text type of message this will run
     case WStype_TEXT: {
       Serial.printf("[%u] Received text message: %s\n", clientNum, payload);
-      // parse incoming JSON data
+      
+      //Make a json doc andparse incoming JSON data
       StaticJsonDocument<64> doc;
       DeserializationError error = deserializeJson(doc, payload);
+
+      //If the deserializing cant recognize it as a Json
+      //It will check the message as a string instead
       if (error) {
         Serial.print("deserializeJson() failed: ");
         Serial.print(error.c_str());
         Serial.println(" (input is not of Json type)");
-        if(strstr((char *)payload, ",") != NULL){
-        char *ptr = strtok((char*)payload, ",");
-        String message = String(ptr);
-        ptr = strtok(NULL, ",");
-        uint8_t value = atoi(ptr);
-          if ( strcmp(message.c_str(), "setSpeed") == 0 )
-            myCar.setSpeed(value);
-        }
-        if ( strcmp((char *)payload, "rotateServoToRight") == 0 )
-          turnServoMotor(-45);
-        if ( strcmp((char *)payload, "rotateServoToLeft") == 0 )
-          turnServoMotor(45);
-        if ( strcmp((char *)payload, "moveForward") == 0 ){
-          if(!disableForward)
-            myCar.moveForward();
-          }
-        if ( strcmp((char *)payload, "moveBackward") == 0 ){
-          myCar.moveBackward();
-          }
-        if ( strcmp((char *)payload, "moveForwardLeft") == 0 ){
-          if(!disableTurnLeft)
-            myCar.turnLeft();
-          }
-        if ( strcmp((char *)payload, "moveForwardRight") == 0 ){
-          if(!disableTurnRight)
-            myCar.turnRight();
-          }
-        if ( strcmp((char *)payload, "moveBackwardRight") == 0 ){
-          if(!disableTurnRight)
-          myCar.backLeft();
-          }
-        if ( strcmp((char *)payload, "moveBackwardLeft") == 0 ){
-          if(!disableTurnLeft)
-          myCar.backRight();
-          }
-        if ( strcmp((char *)payload, "rotateRight") == 0 ){
-          if(!disableRotateRight)
-          myCar.rotateRight();
-          }
-        if ( strcmp((char *)payload, "rotateLeft") == 0 ){
-          if(!disableRotateLeft)
-          myCar.rotateLeft();
-          }
-        if ( strcmp((char *)payload, "stopMove") == 0 )
-          myCar.stopMovement();
+
+        //Message will be processed with these functions and return 
+        handleMessageWithAValue(payload);
+        handleServoRotation(payload);
+        handleMotorMovements(payload);
         return;
       }
+      //If the message received is of a JSON file this part will run
+      //Set the currentLCDtext from the parsed json docs
       currentLCDtext[0] = doc["row1"].as<String>();
       currentLCDtext[1] = doc["row2"].as<String>();
-
-      myLCD.clear();
-      myLCD.setCursor((16 - currentLCDtext[0].length())/2,0);
-      myLCD.print(currentLCDtext[0]);
-      myLCD.setCursor((16 - currentLCDtext[1].length())/2, 1);
-      myLCD.print(currentLCDtext[1]);
+      handlePrintToLCD_Centered();
       }break;
     default:
       break;
   }
 }
 
+//Looping as long as the nodeMCU lives
 void loop() {
+  //This will incoming client and client data from the websocket 
   webSocket.loop();
 
   //Get readings from ultrasonic sensors
@@ -169,10 +138,10 @@ void loop() {
   uint8_t leftSensorDistance = sensorLeft.getDistanceFromMicro();
   delay(5);
 
+  //Get the current status of the sensors
   char* rightStatus = sensorRight.getCurrentStatus();
   char* midStatus = sensorMid.getCurrentStatus();
   char* leftStatus = sensorLeft.getCurrentStatus();
-
   updateAvailableMove(rightStatus, midStatus, leftStatus);
 
   //////////////////////////////////////////
@@ -204,6 +173,7 @@ void loop() {
       /////////////////////////////////
 }
 
+//Classic function to set up the WiFi and print to the LCD
 void connectToWiFi(){
   WiFi.begin(ssid, pass);
   
@@ -213,7 +183,7 @@ void connectToWiFi(){
     myLCD.clear();
     myLCD.setCursor(0,0);
     myLCD.print("Connecting");
-    myLCD.setCursor(9,0);
+    myLCD.setCursor(10,0);
     myLCD.print(".");
     Serial.print(".");
     delay(500);
@@ -234,6 +204,9 @@ void connectToWiFi(){
   myLCD.clear();
 }
 
+//Initialize the server
+//put the webpage into the server or something like that
+//start the server and websocket
 void initServer(){
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
       request->send_P(200, "text/html", index_html);
@@ -245,6 +218,79 @@ void initServer(){
     webSocket.onEvent(onWebSocketEvent);
 }
 
+//This function will set the cursor to as centered as possible
+//based on the string it received then print the text to the LCD
+void handlePrintToLCD_Centered(){
+  myLCD.clear();
+  myLCD.setCursor((16 - currentLCDtext[0].length())/2,0);
+  myLCD.print(currentLCDtext[0]);
+  myLCD.setCursor((16 - currentLCDtext[1].length())/2, 1);
+  myLCD.print(currentLCDtext[1]);
+}
+
+//This function will check whether the message contains a comma
+//then split the message into two part a message and a value
+void handleMessageWithAValue(uint8_t* payload){
+  if(strstr((char *)payload, ",") != NULL){
+    char *ptr = strtok((char*)payload, ",");
+    String message = String(ptr);
+    ptr = strtok(NULL, ",");
+    uint8_t value = atoi(ptr);
+    //Compare the message to a string and change stuffs
+    if ( strcmp(message.c_str(), "setSpeed") == 0 )
+      myCar.setSpeed(value);
+    }
+}
+
+//This function will handle servo rotations
+//to the right is -45 degrees and to the left is 45 degrees
+void handleServoRotation(uint8_t* payload){
+  if ( strcmp((char *)payload, "rotateServoToRight") == 0 )
+    turnServoMotor(-45);
+  if ( strcmp((char *)payload, "rotateServoToLeft") == 0 )
+    turnServoMotor(45);
+}
+
+//This function will handle the car movement based on the message it receive
+//some movement can be block based on the readings of the sensors
+void handleMotorMovements(uint8_t* payload){
+  if ( strcmp((char *)payload, "moveForward") == 0 ){
+    if(!disableForward)
+      myCar.moveForward();
+    }
+  if ( strcmp((char *)payload, "moveBackward") == 0 ){
+    myCar.moveBackward();
+    }
+  if ( strcmp((char *)payload, "moveForwardLeft") == 0 ){
+    if(!disableTurnLeft)
+      myCar.turnLeft();
+    }
+  if ( strcmp((char *)payload, "moveForwardRight") == 0 ){
+    if(!disableTurnRight)
+      myCar.turnRight();
+    }
+  if ( strcmp((char *)payload, "moveBackwardRight") == 0 ){
+    if(!disableTurnRight)
+    myCar.backLeft();
+    }
+  if ( strcmp((char *)payload, "moveBackwardLeft") == 0 ){
+    if(!disableTurnLeft)
+    myCar.backRight();
+    }
+  if ( strcmp((char *)payload, "rotateRight") == 0 ){
+    if(!disableRotateRight)
+    myCar.rotateRight();
+    }
+  if ( strcmp((char *)payload, "rotateLeft") == 0 ){
+    if(!disableRotateLeft)
+    myCar.rotateLeft();
+    }
+  if ( strcmp((char *)payload, "stopMove") == 0 )
+    myCar.stopMovement();
+}
+
+//Takes integers and add it to the current servo angle
+//then write the current servo angle
 void turnServoMotor(int8_t rotateValue){
   if (rotateValue > 180 || rotateValue < -180)
   return;
@@ -255,8 +301,9 @@ void turnServoMotor(int8_t rotateValue){
   Serial.printf("Rotating servo motor by %d and now is at %u\n", rotateValue, currentServoAngle);
 }
 
+//Updates the boolean values responsible to disable the user inputs
+//takes arguments from ultrasonic readings
 void updateAvailableMove(char* rightStatus, char* midStatus, char* leftStatus){
-  // bool disableForward = false, disableRotateRight = false, disableRotateLeft = false, disableTurnRight = false, disableTurnLeft = false;
   if (rightStatus == "very close") {
     disableForward = true;
     disableTurnRight = true;
@@ -296,10 +343,7 @@ void updateAvailableMove(char* rightStatus, char* midStatus, char* leftStatus){
   }
 }
 
-// void stopCarIfUltrasonicSensorCaughtSomething(char* sensorStatus){
-//   if(myCar.currentState != "Parking")
-// }
-
+//Reads the photoresistor and returns either "Bright" or "Darj"
 String photoresistorRead(){
   int sensorValue = analogRead(A0);   // read the input on analog pin 0
 
@@ -318,53 +362,53 @@ String photoresistorRead(){
 /////   CODE FOR TESTING COMPONENTS   /////
 /////                                 /////
 
-void test_run() {
-  char* status1 = sensorRight.getCurrentStatus();
-  char* status2 = sensorMid.getCurrentStatus();
-  char* status3 = sensorLeft.getCurrentStatus();
+// void test_run() {
+//   char* status1 = sensorRight.getCurrentStatus();
+//   char* status2 = sensorMid.getCurrentStatus();
+//   char* status3 = sensorLeft.getCurrentStatus();
 
-  if (status1 == "very close") {
-    myCar.stopMovement();
-    delay(200);
-    return;
-  }
+//   if (status1 == "very close") {
+//     myCar.stopMovement();
+//     delay(200);
+//     return;
+//   }
 
-  if (status2 == "very close") {
-    myCar.stopMovement();
-    delay(200);
-    return;
-  }
+//   if (status2 == "very close") {
+//     myCar.stopMovement();
+//     delay(200);
+//     return;
+//   }
 
-  if (status3 == "very close") {
-    myCar.stopMovement();
-    delay(200);
-    return;
-  }
+//   if (status3 == "very close") {
+//     myCar.stopMovement();
+//     delay(200);
+//     return;
+//   }
 
-  // myCar.moveForward();
-}
+//   // myCar.moveForward();
+// }
 
-void testServo() {
-  int pos;
+// void testServo() {
+//   int pos;
 
-  for (pos = 0; pos <= 180; pos += 1) {  // goes from 0 degrees to 180 degrees
-    // in steps of 1 degree
-    myServo.write(pos);  // tell myServo to go to position in variable 'pos'
-    delay(15);           // waits 15ms for the myServo to reach the position
-  }
-  pinExtender.digitalWrite(P7, HIGH);
-  for (pos = 180; pos >= 0; pos -= 1) {  // goes from 180 degrees to 0 degrees
-    myServo.write(pos);                  // tell myServo to go to position in variable 'pos'
-    delay(15);                           // waits 15ms for the myServo to reach the position
-  }
-  pinExtender.digitalWrite(P7, LOW);
-}
+//   for (pos = 0; pos <= 180; pos += 1) {  // goes from 0 degrees to 180 degrees
+//     // in steps of 1 degree
+//     myServo.write(pos);  // tell myServo to go to position in variable 'pos'
+//     delay(15);           // waits 15ms for the myServo to reach the position
+//   }
+//   pinExtender.digitalWrite(P7, HIGH);
+//   for (pos = 180; pos >= 0; pos -= 1) {  // goes from 180 degrees to 0 degrees
+//     myServo.write(pos);                  // tell myServo to go to position in variable 'pos'
+//     delay(15);                           // waits 15ms for the myServo to reach the position
+//   }
+//   pinExtender.digitalWrite(P7, LOW);
+// }
 
-void testLCD() {
-  // Print a message on both lines of the myLCD.
-  myLCD.setCursor(2, 0);  //Set cursor to character 2 on line 0
-  myLCD.print("Hello world!");
+// void testLCD() {
+//   // Print a message on both lines of the myLCD.
+//   myLCD.setCursor(2, 0);  //Set cursor to character 2 on line 0
+//   myLCD.print("Hello world!");
 
-  myLCD.setCursor(2, 1);  //Move cursor to character 2 on line 1
-  myLCD.print("myLCD Tutorial");
-}
+//   myLCD.setCursor(2, 1);  //Move cursor to character 2 on line 1
+//   myLCD.print("myLCD Tutorial");
+// }

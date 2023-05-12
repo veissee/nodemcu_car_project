@@ -1,6 +1,11 @@
 #ifndef INDEX_HTML_H
 #define INDEX_HTML_H
 
+//Webpage
+//handles receiving and sending messages through the websocket
+//it will create websocket at the same port (81)
+//for receiving it will parse the received JSON file and update elements
+//for sending when click a button or do something will send either JSON file or string to the server
 const char index_html[] PROGMEM = R"====(
 <!DOCTYPE HTML>
 <html>
