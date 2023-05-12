@@ -23,10 +23,10 @@
 #define D8 15
 
 //Web stuffs
-const char* ssid = "Tiara1";
-const char* pass = "0320281926";
-// const char* ssid = "Teter";
-// const char* pass = "qwe123456";
+// const char* ssid = "Tiara1";
+// const char* pass = "0320281926";
+const char* ssid = "Teter";
+const char* pass = "qwe123456";
 AsyncWebServer server(80); 
 WebSocketsServer webSocket = WebSocketsServer(81);
 

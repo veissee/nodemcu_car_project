@@ -422,9 +422,9 @@ font-weight: bolder;
     const reading = data.photoResistor_read;
 
     if (reading === 'Bright') {
-      document.getElementById('panels').style.backgroundColor = '#ffffff7a';
+      document.getElementById('panels').style.backgroundColor = 'white';
     } else if (reading === 'Dark'){
-      document.getElementById('panels').style.backgroundColor = '000000db';
+      document.getElementById('panels').style.backgroundColor = 'black';
     }
 
   });
