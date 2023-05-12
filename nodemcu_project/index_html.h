@@ -46,7 +46,7 @@ font-weight: bolder;
 }
 
 .content {
-    background-color: #867c6f;
+    background-color: #bb9a6f;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -76,6 +76,7 @@ font-weight: bolder;
     width: 80%;
     justify-content: flex-start;
     align-items: center;
+    border-radius: 100px;
 }
 .ultrasonicsensorspanels{
     background-color: #af844c;
@@ -343,7 +344,7 @@ font-weight: bolder;
         <span class="toptext">NodeMCU Car Control Panel</span>
       </div>
       <div class="content">
-        <div class="panels">
+        <div class="panels" id="panels">
           <div class="empty2"></div>
           <div class="ultrasonicsensorspanels">
             <div class="ultrasonicsensorspanel">
@@ -418,6 +419,14 @@ font-weight: bolder;
     document.getElementById("input-row1").placeholder = data.current_LCD_text_row1;
     document.getElementById("input-row2").placeholder = data.current_LCD_text_row2;
     document.getElementById('current-servo-angle').innerHTML = data.current_servo_angle + "°";
+    const reading = data.photoResistor_read;
+
+    if (reading === 'Bright') {
+      document.getElementById('panels').style.backgroundColor = '#ffffff7a';
+    } else if (reading === 'Dark'){
+      document.getElementById('panels').style.backgroundColor = '000000db';
+    }
+
   });
 
   function sendLCDText() {

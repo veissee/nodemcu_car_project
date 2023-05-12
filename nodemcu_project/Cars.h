@@ -40,7 +40,7 @@ class Cars{
     "Rotating Right",
     "Rotating Left"
     };
-    char* currentState;
+    
 
     //Initialitazion of the cars object.
     //Set the pins as outputs.
@@ -48,6 +48,7 @@ class Cars{
     void init();
 
     public:
+    char* currentState;
     //Cars constructor takes pcf8574, IN 1-4 (Direction pins), and EN A & B(Speed pins) as arguments.
     Cars(PCF8574& pcf8574,uint8_t motorDirectionPin_RightIN1,uint8_t motorDirectionPin_RightIN2, uint8_t motorDirectionPin_LeftIN3, uint8_t motorDirectionPin_LeftIN4, uint8_t motorSpeedPin_Right, uint8_t motorSpeedPin_Left);
 

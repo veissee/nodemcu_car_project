@@ -109,22 +109,37 @@ void onWebSocketEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t
           turnServoMotor(-45);
         if ( strcmp((char *)payload, "rotateServoToLeft") == 0 )
           turnServoMotor(45);
-        if ( strcmp((char *)payload, "moveForward") == 0 )
-          myCar.moveForward();
-        if ( strcmp((char *)payload, "moveBackward") == 0 )
+        if ( strcmp((char *)payload, "moveForward") == 0 ){
+          if(!disableForward)
+            myCar.moveForward();
+          }
+        if ( strcmp((char *)payload, "moveBackward") == 0 ){
           myCar.moveBackward();
-        if ( strcmp((char *)payload, "moveForwardLeft") == 0 )
-          myCar.turnLeft();
-        if ( strcmp((char *)payload, "moveForwardRight") == 0 )
-          myCar.turnRight();
-        if ( strcmp((char *)payload, "moveBackwardRight") == 0 )
+          }
+        if ( strcmp((char *)payload, "moveForwardLeft") == 0 ){
+          if(!disableTurnLeft)
+            myCar.turnLeft();
+          }
+        if ( strcmp((char *)payload, "moveForwardRight") == 0 ){
+          if(!disableTurnRight)
+            myCar.turnRight();
+          }
+        if ( strcmp((char *)payload, "moveBackwardRight") == 0 ){
+          if(!disableTurnRight)
           myCar.backLeft();
-        if ( strcmp((char *)payload, "moveBackwardLeft") == 0 )
+          }
+        if ( strcmp((char *)payload, "moveBackwardLeft") == 0 ){
+          if(!disableTurnLeft)
           myCar.backRight();
-        if ( strcmp((char *)payload, "rotateRight") == 0 )
+          }
+        if ( strcmp((char *)payload, "rotateRight") == 0 ){
+          if(!disableRotateRight)
           myCar.rotateRight();
-        if ( strcmp((char *)payload, "rotateLeft") == 0 )
+          }
+        if ( strcmp((char *)payload, "rotateLeft") == 0 ){
+          if(!disableRotateLeft)
           myCar.rotateLeft();
+          }
         if ( strcmp((char *)payload, "stopMove") == 0 )
           myCar.stopMovement();
         return;
@@ -145,8 +160,8 @@ void onWebSocketEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t
 
 void loop() {
   webSocket.loop();
-  //testPhotoresistor();
-  //get the distances from ultrasonic sensors
+
+  //Get readings from ultrasonic sensors
   uint8_t rightSensorDistance = sensorRight.getDistanceFromMicro();
   delay(5);
   uint8_t midSensorDistance = sensorMid.getDistanceFromMicro();
@@ -154,23 +169,39 @@ void loop() {
   uint8_t leftSensorDistance = sensorLeft.getDistanceFromMicro();
   delay(5);
 
-  // test_run();
+  char* rightStatus = sensorRight.getCurrentStatus();
+  char* midStatus = sensorMid.getCurrentStatus();
+  char* leftStatus = sensorLeft.getCurrentStatus();
 
-  StaticJsonDocument<200> doc;
+  updateAvailableMove(rightStatus, midStatus, leftStatus);
 
-  doc["right_sensor_status"] = sensorRight.getCurrentStatus();
-  doc["middle_sensor_status"] = sensorMid.getCurrentStatus();
-  doc["left_sensor_status"] = sensorLeft.getCurrentStatus();
+  //////////////////////////////////////////
+   ///////////////////////////////////////
+      /////////////////////////////////
+
+  ///
+  /// Make a Json documents that hold statuses
+  ///     and send it through websocket
+  StaticJsonDocument<400> doc;
+
+  doc["right_sensor_status"] = rightStatus;
+  doc["middle_sensor_status"] = midStatus;
+  doc["left_sensor_status"] = leftStatus;
   doc["right_sensor_distance"] = rightSensorDistance;
   doc["middle_sensor_distance"] = midSensorDistance;
   doc["left_sensor_distance"] = leftSensorDistance;
   doc["current_LCD_text_row1"] = currentLCDtext[0];
   doc["current_LCD_text_row2"] = currentLCDtext[1];
+  doc["photoResistor_read"] = photoresistorRead();
   doc["current_servo_angle"] = currentServoAngle - 90;
 
   String jsonString;
   serializeJson(doc, jsonString);
   webSocket.broadcastTXT(jsonString);
+
+  //////////////////////////////////////////
+   ///////////////////////////////////////
+      /////////////////////////////////
 }
 
 void connectToWiFi(){
@@ -200,6 +231,7 @@ void connectToWiFi(){
   myLCD.setCursor(0,1);
   myLCD.print(WiFi.localIP());
   delay(2000);
+  myLCD.clear();
 }
 
 void initServer(){
@@ -223,24 +255,73 @@ void turnServoMotor(int8_t rotateValue){
   Serial.printf("Rotating servo motor by %d and now is at %u\n", rotateValue, currentServoAngle);
 }
 
+void updateAvailableMove(char* rightStatus, char* midStatus, char* leftStatus){
+  // bool disableForward = false, disableRotateRight = false, disableRotateLeft = false, disableTurnRight = false, disableTurnLeft = false;
+  if (rightStatus == "very close") {
+    disableForward = true;
+    disableTurnRight = true;
+    disableRotateRight = true;
+  }
+
+  if (midStatus == "very close") {
+    disableForward = true;
+    disableTurnLeft = true;
+    disableTurnRight = true;
+  }
+
+  if (leftStatus == "very close") {
+    disableForward = true;
+    disableTurnLeft = true;
+    disableRotateLeft = true;
+  }
+
+  if(leftStatus != "very close" && midStatus != "very close"){
+    disableTurnLeft = false;
+  }
+
+  if(rightStatus != "very close" && midStatus != "very close"){
+    disableTurnLeft = false;
+  }
+
+  if (leftStatus != "very close"){
+    disableRotateLeft = false;
+  }
+
+  if (rightStatus != "very close"){
+    disableRotateRight = false;
+  }
+
+  if (midStatus != "very close"){
+    disableForward = false;
+  }
+}
+
+// void stopCarIfUltrasonicSensorCaughtSomething(char* sensorStatus){
+//   if(myCar.currentState != "Parking")
+// }
+
+String photoresistorRead(){
+  int sensorValue = analogRead(A0);   // read the input on analog pin 0
+
+	float voltage = sensorValue * (5.0 / 1023.0);   // Convert the analog reading (which goes from 0 - 1023) to a voltage (0 - 5V)
+
+  Serial.println(voltage);
+
+  if (voltage < 2.0) {
+    return "Bright";
+  } else {
+    return "Dark";
+  }
+}
+
+/////                                 /////
+/////   CODE FOR TESTING COMPONENTS   /////
+/////                                 /////
+
 void test_run() {
   char* status1 = sensorRight.getCurrentStatus();
   char* status2 = sensorMid.getCurrentStatus();
   char* status3 = sensorLeft.getCurrentStatus();
-
-    // Serial.print(status1);
-    // Serial.print(" |");
-    // Serial.print(distance);
-    // Serial.print(" cm  |");
-    // Serial.print(status2);
-    // Serial.print(" |");
-    // Serial.print(distance2);
-    // Serial.print(" cm  |");
-    // Serial.print(status3);
-    // Serial.print(" |");
-    // Serial.print(distance3);
-    // Serial.print(" cm  |");
-    // Serial.println();
 
   if (status1 == "very close") {
     myCar.stopMovement();
@@ -263,16 +344,6 @@ void test_run() {
   // myCar.moveForward();
 }
 
-void testPhotoresistor(){
-  int sensorValue = analogRead(A0);   // read the input on analog pin 0
-
-	float voltage = sensorValue * (5.0 / 1023.0);   // Convert the analog reading (which goes from 0 - 1023) to a voltage (0 - 5V)
-
-  Serial.print(sensorValue);
-  Serial.print(" ");
-	Serial.println(voltage);   // print out the value you read
-}
-
 void testServo() {
   int pos;
 
@@ -288,28 +359,6 @@ void testServo() {
   }
   pinExtender.digitalWrite(P7, LOW);
 }
-
-// void checkAvailableMove(){
-//   // bool disableForward = false, disableRotateRight = false, disableRotateLeft = false, disableTurnRight = false, disableTurnLeft = false;
-//   char* states
-//   if ( == "very close") {
-//     disableForward = true;
-//     disable
-//   }
-
-//   if (status2 == "very close") {
-//     myCar.stopMovement();
-//     delay(200);
-//     return;
-//   }
-
-//   if (status3 == "very close") {
-//     myCar.stopMovement();
-//     delay(200);
-//     return;
-//   }
-
-// }
 
 void testLCD() {
   // Print a message on both lines of the myLCD.
